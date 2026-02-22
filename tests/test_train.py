@@ -126,7 +126,7 @@ def test_train_cli_gen_output(mock_qlib_init, mock_get_config, mock_rolling_gen,
     # 5. 验证逻辑
     # 验证 RollingGen 是否被正确参数化初始化
     mock_rolling_gen.assert_called_once()
-    args, kwargs = mock_rolling_gen.call_args
+    _, kwargs = mock_rolling_gen.call_args
     assert kwargs['step'] == 40
     assert kwargs['rtype'] == "step"
 

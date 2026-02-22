@@ -45,7 +45,7 @@ def test_setup_project(mock_settings):
 
 # 3. 测试 Markdown 页面生成逻辑
 def test_scan_and_generate(mock_settings):
-    data_dir, build_dir = mock_settings
+    _, build_dir = mock_settings
     gen_page.setup_project()
     gen_page.scan_and_generate()
 

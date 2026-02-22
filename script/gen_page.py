@@ -17,7 +17,7 @@ def setup_project():
     # 这里的 use_directory_urls: false 解决了点击链接跳到“索引”页面的问题
     config = f"""
 site_name: {SITE_NAME}
-use_directory_urls: false  
+use_directory_urls: false
 theme:
   name: material
   language: zh
@@ -62,7 +62,7 @@ def create_custom_css():
 }
 
 /* 4. 固定第一列 (可选，滑动时 ID 列不动) */
-.md-typeset th:first-child, 
+.md-typeset th:first-child,
 .md-typeset td:first-child {
     position: sticky;
     left: 0;
@@ -81,7 +81,7 @@ def scan_and_generate():
 
     # 生成首页
     with open(docs_root / "index.md", "w", encoding="utf-8") as f:
-        f.write(f"# 📂 根目录\n\n自动扫描完成。点击左侧查看数据。")
+        f.write("# 📂 根目录\n\n自动扫描完成。点击左侧查看数据。")
 
     for root, dirs, files in os.walk(source_root):
         rel_path = Path(root).relative_to(source_root)
@@ -104,11 +104,11 @@ def scan_and_generate():
 
 def build_site():
     """构建静态网站"""
-    print(f"🚀 开始构建...")
+    print("🚀 开始构建...")
     result = subprocess.run(["mkdocs", "build"], cwd=BUILD_DIR)
     if result.returncode == 0:
         site_path = os.path.abspath(os.path.join(BUILD_DIR, 'site'))
-        print(f"\n✨ 构建完成！")
+        print("\n✨ 构建完成！")
         print(f"📂 静态网页目录: {site_path}")
         print(f"💡 本地直接打开: 双击 {site_path}/index.html")
         print(f"💡 WSL 预览命令: cd {BUILD_DIR}/site && python3 -m http.server 8080")

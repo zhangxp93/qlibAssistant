@@ -50,7 +50,7 @@ class ModelCLI:
         qlib.init(provider_uri=provider_uri, region=region, exp_manager=exp_manager)
 
     def filter_rec(self, rec):
-        ic_info, ic_list = self.get_ic_info(rec)
+        _, ic_list = self.get_ic_info(rec)
         ic_filter = self.kwargs.get('rec_filter')
         if not ic_filter:
             return True
@@ -108,18 +108,18 @@ class ModelCLI:
         logger.info(f"experiment num: {len(ret)}, rid num: {total_rids}")
 
     def get_ic_info(self, rec):
-        ic = rec.load_object(f"{SIG_ANALYSIS_DIR}/ic.pkl")
-        ric = rec.load_object(f"{SIG_ANALYSIS_DIR}/ric.pkl")
-        IC, RankIC = ic.mean(), ric.mean()
-        ICIR, RankICIR = IC / ic.std(), RankIC / ric.std()
+        ic_pkl = rec.load_object(f"{SIG_ANALYSIS_DIR}/ic.pkl")
+        ric_pkl = rec.load_object(f"{SIG_ANALYSIS_DIR}/ric.pkl")
+        ic, rank_ic = ic_pkl.mean(), ric_pkl.mean()
+        icir, rank_icir = ic / ic_pkl.std(), rank_ic / ric_pkl.std()
 
         ic_info = {
-            "IC": float(np.around(IC, 3)),
-            "ICIR": float(np.around(ICIR, 3)),
-            "Rank IC": float(np.around(RankIC, 3)),
-            "Rank ICIR": float(np.around(RankICIR, 3)),
+            "IC": float(np.around(ic, 3)),
+            "ICIR": float(np.around(icir, 3)),
+            "Rank IC": float(np.around(rank_ic, 3)),
+            "Rank ICIR": float(np.around(rank_icir, 3)),
         }
-        return ic_info, [IC, ICIR, RankIC, RankICIR]
+        return ic_info, [ic, icir, rank_ic, rank_icir]
 
     def get_train_time(self, rec):
         task = rec.load_object("task")

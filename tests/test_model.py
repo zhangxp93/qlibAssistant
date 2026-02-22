@@ -35,7 +35,7 @@ def mock_cli_params():
 @patch('modelcli.qlib.init')
 def test_model_cli_init(mock_qlib_init, mock_cli_params):
     # 使用 patch.dict 修改全局配置对象 C，而不是直接 patch C
-    with patch('modelcli.C', dict(exp_manager={"kwargs": {"uri": ""}})):
+    with patch('modelcli.C', exp_manager={"kwargs": {"uri": ""}}):
         cli = ModelCLI(region="cn", **mock_cli_params)
         assert cli.kwargs["model_name"] is None # 现在不会 KeyError 了
 
