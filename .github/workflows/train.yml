@@ -101,14 +101,13 @@ jobs:
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          # 2. 修改：使用 ${{ env.CURRENT_DATE }} 引用变量
-          tag_name: model-release-${{ github.event.schedule || 'manual' }}-${{ env.CURRENT_DATE }}-${{ github.run_id }}
-          name: Model Release ${{ env.CURRENT_DATE }}
+          tag_name: "model-release-${{ env.CURRENT_DATE }}-${{ github.run_id }}"
+          name: "Model Release ${{ env.CURRENT_DATE }}"
           body: |
             自动训练模型发布
             - 训练日期: ${{ env.CURRENT_DATE }}
             - 任务 ID: ${{ github.run_id }}
-          # 指定你的压缩包路径
+            - 触发方式: ${{ github.event_name }}
           files: |
             model_pkl/*.tar.gz
         env:
