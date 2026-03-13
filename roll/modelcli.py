@@ -49,6 +49,7 @@ class ModelCLI:
     def __init__(self, region=REG_CN, **kwargs):
         self.kwargs = kwargs
         self._init_qlib(region)
+        self.review_result_string = ""
 
     def _init_qlib(self, region):
         """初始化 Qlib 配置"""
@@ -320,6 +321,30 @@ class ModelCLI:
         df.columns = ['real_label']
         return df
 
+    def get_orignal_data(self, dates=None, instruments='csi300'):
+        if dates is None:
+            dates = self.kwargs['predict_dates'][0]
+        fields = [
+            '$close * $factor', 
+            '$open * $factor', 
+            '$high * $factor', 
+            '$low * $factor',
+        ]
+
+        df = D.features(
+            D.instruments(instruments),
+            fields,
+            start_time=dates['start'],
+            end_time=dates['end'],
+            freq='day'
+        )
+        df.columns = ['close', 'open', 'high', 'low']
+        df = df.reset_index()
+        # 检查返回结果是否为空，并提醒用户
+        if df.empty:
+            print(f"数据为空, 请检查参数: instruments={instruments}, dates={dates}")
+        return df
+
     def get_alpha_data(self, name="Alpha158"):
         dates = self.kwargs['predict_dates'][0]
         handler_kwargs = {"instruments": "csi300", "start_time": dates['start'], "end_time": dates['end'], "infer_processors": []}
@@ -369,7 +394,7 @@ class ModelCLI:
 
         print("✅ 恢复完成。")
 
-    def _review_csv(self, df, real_df):
+    def _review_csv(self, df, real_df, n1, n2):
         df = df[df["avg_score"] > 0].copy()  # 避免 SettingWithCopyWarning
         real_map = real_df.drop_duplicates('instrument').set_index('instrument')['real_label']
         df['real_label'] = df['instrument'].map(real_map)
@@ -377,33 +402,56 @@ class ModelCLI:
         df['error'] = df['avg_score'] - df['real_label']
         df['abs_error'] = df['error'].abs()
 
-        '''
-        统计 top10, top30, top50, top100 的胜率, 止盈>0, 止盈1% 止盈2% 止盈3% 止盈4% 等等的胜率
-        '''
-        top10_df = df.sort_values(by='avg_score', ascending=False).head(10)
-        top30_df = df.sort_values(by='avg_score', ascending=False).head(30)
-        top50_df = df.sort_values(by='avg_score', ascending=False).head(50)
-        top100_df = df.sort_values(by='avg_score', ascending=False).head(100)
 
-        top10_radio = ((top10_df['real_label'] * top10_df['avg_score']) > 0).sum() / len(top10_df)
-        top30_radio = ((top30_df['real_label'] * top30_df['avg_score']) > 0).sum() / len(top30_df)
-        top50_radio = ((top50_df['real_label'] * top50_df['avg_score']) > 0).sum() / len(top50_df)
-        top100_radio = ((top100_df['real_label'] * top100_df['avg_score']) > 0).sum() / len(top100_df)
+        # 把 n1 的 close 和 n2 的 high 按照 instrument 合并到 df 里面，且名称叫做 n1close n2high
+        # n1: DataFrame, 包含 'instrument', 'close'
+        # n2: DataFrame, 包含 'instrument', 'high'
 
-        top10_avg_profit = top10_df['real_label'].mean()
-        top30_avg_profit = top30_df['real_label'].mean()
-        top50_avg_profit = top50_df['real_label'].mean()
-        top100_avg_profit = top100_df['real_label'].mean()
+        n1_renamed = n1[['instrument', 'close']].rename(columns={'close': 'n1close'})
+        n2_renamed = n2[['instrument', 'high']].rename(columns={'high': 'n2high'})
 
-        print(
-            f"top10 胜率: {top10_radio:.2%}, top10 平均收益: {top10_avg_profit*100:.2f}%, "
-            f"top30 胜率: {top30_radio:.2%}, top30 平均收益: {top30_avg_profit*100:.2f}%, "
-            f"top50 胜率: {top50_radio:.2%}, top50 平均收益: {top50_avg_profit*100:.2f}%, "
-            f"top100 胜率: {top100_radio:.2%}, top100 平均收益: {top100_avg_profit*100:.2f}%"
-        )
+        df = df.merge(n1_renamed, on='instrument', how='left')
+        df = df.merge(n2_renamed, on='instrument', how='left')
+
+
+        top_num_list = [10, 30, 50, 80, 100]
+        profit_num_list = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
+
+        # 使用一个 DataFrame 记录循环里的统计信息
+        import pandas as pd
+        results = []
+        for top_num in top_num_list:
+            topk_df = df.sort_values(by='avg_score', ascending=False).head(top_num)
+            topk_radio = ((topk_df['real_label'] * topk_df['avg_score']) > 0).sum() / len(topk_df)
+            topk_avg_profit = topk_df['real_label'].mean()
+            for profit_num in profit_num_list:
+                topk_df_profit = (topk_df['n2high'] > topk_df['n1close'] * (1 + profit_num)).sum() / len(topk_df)
+                # 收集当前循环的统计数据到 results 列表
+                results.append({
+                    'top_num': top_num, 
+                    'topk_radio': topk_radio, 
+                    'topk_avg_profit': topk_avg_profit, 
+                    'profit_num': profit_num, 
+                    'topk_df_profit': topk_df_profit
+                })
+        # 转换为 DataFrame 并展示
+        stats_df = pd.DataFrame(results)
+        # print(stats_df)
+        result_string = ""
+        for top_num in top_num_list:
+            sub_df = stats_df[stats_df['top_num'] == top_num]
+            if not sub_df.empty:
+                result_lines = []
+                result_lines.append(f"top{top_num} 持仓一天正收益几率: {sub_df.iloc[0]['topk_radio']:.2%}, 平均收益: {sub_df.iloc[0]['topk_avg_profit']*100:.2f}%,")
+                for _, row in sub_df.iterrows():
+                    result_lines.append(f"\ttop{top_num} 止盈{row['profit_num']} 胜率: {row['topk_df_profit']:.2%}")
+                result_string += '\n'.join(result_lines) + "\n"
+        # print(result_string)
+        return stats_df, result_string
 
     def _review_subdir(self, subdir):
         print(f"- {subdir.name}")
+        self.review_result_string += f"# {subdir.name}\n"
         # 优化：集中提取日期，减少冗余检查
         date_str = next(
             (
@@ -418,12 +466,30 @@ class ModelCLI:
         else:
             print("未发现格式为 xxxx-xx-xx_ 的 CSV 文件名")
 
-        trade_data = get_trade_data(self.kwargs.get("provider_uri"))
-        if date_str and trade_data and date_str in trade_data[-2:]:
+        trade_data_list = get_trade_data(self.kwargs.get("provider_uri"))
+        if date_str and trade_data_list and date_str in trade_data_list[-2:]:
             logger.info(f"还不能复盘 {date_str}")
             return
 
-        logger.info(f"开始复盘 {date_str if date_str else '[未知日期]'}")
+        next1_date = None
+        if date_str and trade_data_list:
+            try:
+                idx = trade_data_list.index(date_str)
+                if idx + 1 < len(trade_data_list):
+                    next1_date = trade_data_list[idx + 1]
+            except ValueError:
+                next1_date = None
+
+        next2_date = None
+        if next1_date and trade_data_list:
+            try:
+                idx = trade_data_list.index(next1_date)
+                if idx + 1 < len(trade_data_list):
+                    next2_date = trade_data_list[idx + 1]
+            except ValueError:
+                next2_date = None
+
+        logger.info(f"开始复盘 {date_str if date_str else '[未知日期]'}  btw:[下1个交易日: {next1_date if next1_date else '[未知日期]'}  下2个交易日: {next2_date if next2_date else '[未知日期]'}]")
         df_filter_ret, df_ret = None, None
         if date_str:
             filter_ret_path = subdir / f"{date_str}_filter_ret.csv"
@@ -465,11 +531,18 @@ class ModelCLI:
                 else:
                     print(f"⚠️ {name} 中不存在 'KMID' 列，未做裁剪。")
 
-        print("分析 df_ret:")
-        self._review_csv(df_ret, real_df)
-        print("分析 df_filter_ret:")
-        self._review_csv(df_filter_ret, real_df)
+        next1_date_original_data = self.get_orignal_data(dates={"start": next1_date, "end": next1_date})
+        next2_date_original_data = self.get_orignal_data(dates={"start": next2_date, "end": next2_date})
 
+        print("分析 df_ret:")
+        self.review_result_string += f"## {date_str}_ret.csv\n"
+        stats_df, result_string = self._review_csv(df_ret, real_df, next1_date_original_data, next2_date_original_data)
+        self.review_result_string += result_string
+
+        print("分析 df_filter_ret:")
+        self.review_result_string += f"## {date_str}_filter_ret.csv\n"
+        stats_df, result_string = self._review_csv(df_filter_ret, real_df, next1_date_original_data, next2_date_original_data)
+        self.review_result_string += result_string
 
     def review(self):
         """马后炮"""
@@ -495,3 +568,6 @@ class ModelCLI:
         )
         for subdir in sorted_subdirs:
             self._review_subdir(subdir)
+        print(self.review_result_string)
+        append_to_file("/tmp/review_result.md", self.review_result_string, mode='w')
+        logger.info(f"review result saved to /tmp/review_result.md")
