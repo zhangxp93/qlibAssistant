@@ -362,7 +362,7 @@ class ModelCLI:
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
         # 精确到分钟的时间戳
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        timestamp = get_local_data_date(self.kwargs['provider_uri']).strip()
         archive_path = BACKUP_DIR / f"mlruns_{timestamp}.tar.gz"
 
         print(f"📦 正在打包: {SOURCE_DIR} -> {archive_path.name}")
