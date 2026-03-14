@@ -278,6 +278,21 @@ def fix_mlflow_paths(mlruns_dir: Optional[str] = None):
     logger.info(f"路径修复完成，共修改 {fix_count} 处。")
 
 
+def get_mlruns_dates(backup_dir="../model_pkl"):
+    """从 model_pkl 目录解析 mlruns_YYYY-MM-DD 格式的日期列表"""
+    backup_path = Path(backup_dir).resolve()
+    if not backup_path.exists():
+        print(f"目录不存在: {backup_path}")
+        return []
+
+    pattern = re.compile(r"mlruns_(\d{4}-\d{2}-\d{2})")
+    dates = []
+    for file in backup_path.glob("mlruns_*.tar.gz"):
+        match = pattern.search(file.name)
+        if match:
+            dates.append(match.group(1))
+    return dates
+
 
 def generate_qlib_segments(months_total=12, end_date_str=None):
     """
