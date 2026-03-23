@@ -297,7 +297,8 @@ def push_table_from_csv(
     tb = to_branch or f"dolt-csv-{uuid.uuid4().hex[:12]}"
 
     if not os.path.isfile(csv_path):
-        raise DoltHubSqlError(f"本地文件不存在: {csv_path}")
+        print(f"⚠️ 本地文件不存在，已跳过: {csv_path}")
+        return
 
     df = pd.read_csv(csv_path, encoding="utf-8")
     df.columns = [str(c).strip() for c in df.columns]
@@ -415,7 +416,8 @@ def _collect_csv_paths_by_name_filter(
     - ``recursive=True``：``os.walk`` 全遍历子目录
     """
     if not os.path.isdir(root):
-        raise DoltHubSqlError(f"目录不存在: {root}")
+        print(f"⚠️ 目录不存在，已跳过扫描: {root}")
+        return []
     paths: list[str] = []
     if recursive:
         for dirpath, _dirnames, filenames in os.walk(root):
@@ -575,7 +577,8 @@ def push_backtest_csvs_by_name_rule(
     other = "push_backtest_filter_ret" if not name_contains_filter else "push_backtest_ret"
     if path:
         if not os.path.isfile(path):
-            raise DoltHubSqlError(f"文件不存在: {path}")
+            print(f"⚠️ 文件不存在，已跳过: {path}")
+            return
         bn = os.path.basename(path).lower()
         has_f = "filter" in bn
         if name_contains_filter and not has_f:
@@ -707,7 +710,8 @@ def push_csv_group_by_name_rule(
     """
     if path:
         if not os.path.isfile(path):
-            raise DoltHubSqlError(f"文件不存在: {path}")
+            print(f"⚠️ 文件不存在，已跳过: {path}")
+            return
         bn = os.path.basename(path).lower()
         has_f = "filter" in bn
         if name_contains_filter and not has_f:
