@@ -7,8 +7,11 @@ dependencies = [
     "akshare>=1.18.48",
     "beautifulsoup4>=4.14.3",
     "loguru>=0.7.3",
+    "mlflow>=3.10.1",
     "python-dateutil>=2.9.0.post0",
     "python-fire>=0.1.0",
     "pyyaml>=6.0.3",
     "requests>=2.33.0",
+    "setuptools<70",
+    "trainer>=0.0.36",
 ]

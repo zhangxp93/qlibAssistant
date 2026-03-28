@@ -32,7 +32,19 @@ def _train_worker(task, exp_name):
     """
     try:
         # 打印 PID 方便观察
-        logger.info(f"🔵 [子进程 PID: {os.getpid()}] 开始训练...", flush=True)
+        logger.info(f"🔵 [子进程 PID: {os.getpid()}] 开始初始化 qlib...", flush=True)
+        
+        # 在子进程中重新初始化 qlib
+        from qlib.config import C as qlib_C
+        exp_manager = qlib_C["exp_manager"]
+        exp_manager["kwargs"]["uri"] = "file:" + str(Path(task.get('uri_folder', '~/.qlibAssistant/mlruns/')).expanduser())
+        qlib.init(
+            provider_uri=task.get('provider_uri', '~/.qlib/qlib_data/cn_data/'),
+            region=task.get('region', REG_CN),
+            exp_manager=exp_manager
+        )
+        
+        logger.info(f"🔵 [子进程 PID: {os.getpid()}] qlib 初始化完成，开始训练...", flush=True)
 
         # 实例化 Trainer 并开始训练
         trainer = TrainerR(experiment_name=exp_name)
@@ -42,14 +54,19 @@ def _train_worker(task, exp_name):
         os._exit(0)  # 确保子进程正常退出，exitcode 0
     except Exception as e:
         # 捕获异常打印出来，并再次抛出以确保 exitcode 非 0
-        logger.info(f"🔴 [子进程 PID: {os.getpid()}] 训练出错: {e}", flush=True)
+        logger.info(f"🔴 [子进程 PID: {os.getpid()}] 训练出错：{e}", flush=True)
         raise e
 
-def run_train_blocking(task, exp_name):
+def run_train_blocking(task, exp_name, **kwargs):
     """
     主进程调用的函数。
     功能：启动子进程 -> 阻塞等待 -> 返回结果
     """
+    # 将必要的配置信息添加到 task 中，供子进程使用
+    task['uri_folder'] = kwargs.get('uri_folder')
+    task['provider_uri'] = kwargs.get('provider_uri')
+    task['region'] = kwargs.get('region', REG_CN)
+    
     # 1. 创建子进程，目标是上面的 _train_worker 函数
     p = multiprocessing.Process(target=_train_worker, args=(task, exp_name))
 
@@ -60,12 +77,12 @@ def run_train_blocking(task, exp_name):
     # 此时主进程什么都不干，内存也不会增加，静静等待子进程销毁
     p.join()
 
-    logger.info(f"子进程 PID: {p.pid} 已结束，退出代码: {p.exitcode}")
+    logger.info(f"子进程 PID: {p.pid} 已结束，退出代码：{p.exitcode}")
     # 4. 判断子进程是正常结束还是报错挂了
     if p.exitcode == 0:
         return True  # 成功
     else:
-        logger.info(f"⚠️ 任务失败，子进程退出代码: {p.exitcode}")
+        logger.info(f"⚠️ 任务失败，子进程退出代码：{p.exitcode}")
         return False # 失败
 
 
@@ -179,7 +196,7 @@ class TrainCLI:
                 logger.info(f"Skipping training for segment {train_time_seg} as it already exists in the experiment.")
                 continue
 
-            run_train_blocking(task, exp_name)
+            run_train_blocking(task, exp_name, **self.kwargs)
             gc.collect()
 
     def start_custom(self):
