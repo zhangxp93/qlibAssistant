@@ -1,3 +1,5 @@
+# IDE工具配置文件
+.idea
 qlib_score_csv/
 review_csv/
 .vscode/
